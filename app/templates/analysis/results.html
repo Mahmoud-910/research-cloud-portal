@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Results — Research Cloud Portal{% endblock %}
+
+{% block content %}
+<div class="portal-page">
+  <div class="container-fluid px-4 py-4">
+
+    <div class="page-header mb-4 d-flex align-items-center justify-content-between">
+      <div>
+        <h2 class="page-title"><i class="fas fa-chart-bar me-2 text-accent"></i>Analysis Results</h2>
+        <p class="page-sub mono">Job #{{ job_id }}</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="/static/results/{{ job_id }}/cleaned_data.csv"
+           class="btn btn-result btn-sm" download>
+          <i class="fas fa-download me-1"></i>Download Cleaned CSV
+        </a>
+        <a href="{{ url_for('analysis.upload') }}" class="btn btn-launch btn-sm">
+          <i class="fas fa-plus me-1"></i>New Analysis
+        </a>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    {% if summary.overview %}
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon"><i class="fas fa-table-rows"></i></div>
+          <div class="stat-val">{{ summary.overview.rows }}</div>
+          <div class="stat-lbl">Rows</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card stat-running">
+          <div class="stat-icon"><i class="fas fa-table-columns"></i></div>
+          <div class="stat-val">{{ summary.overview.columns }}</div>
+          <div class="stat-lbl">Columns</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card stat-done">
+          <div class="stat-icon"><i class="fas fa-database"></i></div>
+          <div class="stat-val">{{ summary.overview.memory_usage_kb }} KB</div>
+          <div class="stat-lbl">Memory</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card stat-sim">
+          <div class="stat-icon"><i class="fas fa-columns"></i></div>
+          <div class="stat-val">{{ summary.overview.column_names | length }}</div>
+          <div class="stat-lbl">Features</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Cleaning Report -->
+    {% if summary.cleaning %}
+    <div class="portal-card mb-4">
+      <div class="portal-card-header"><i class="fas fa-broom me-2"></i>Data Cleaning Report</div>
+      <div class="portal-card-body">
+        <div class="row g-3">
+          <div class="col-md-3 text-center">
+            <div class="mono text-accent" style="font-size:1.8rem">{{ summary.cleaning.duplicates_removed }}</div>
+            <div class="text-muted small">Duplicates Removed</div>
+          </div>
+          <div class="col-md-3 text-center">
+            <div class="mono text-accent" style="font-size:1.8rem">{{ summary.cleaning.missing_before }}</div>
+            <div class="text-muted small">Missing Before</div>
+          </div>
+          <div class="col-md-3 text-center">
+            <div class="mono text-success" style="font-size:1.8rem">{{ summary.cleaning.missing_after }}</div>
+            <div class="text-muted small">Missing After</div>
+          </div>
+          <div class="col-md-3 text-center">
+            <div class="mono text-accent" style="font-size:1.8rem">{{ summary.cleaning.rows_after_clean }}</div>
+            <div class="text-muted small">Final Rows</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Statistical Analysis -->
+    {% if summary.stats and summary.stats.descriptive %}
+    <div class="portal-card mb-4">
+      <div class="portal-card-header"><i class="fas fa-chart-bar me-2"></i>Statistical Analysis</div>
+      <div class="portal-card-body p-0">
+        <div class="table-responsive">
+          <table class="table portal-table mb-0">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                {% for col in summary.stats.descriptive.keys() %}
+                <th>{{ col }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% set metrics = ["count","mean","std","min","25%","50%","75%","max"] %}
+              {% for metric in metrics %}
+              <tr>
+                <td><span class="mono text-accent">{{ metric }}</span></td>
+                {% for col, vals in summary.stats.descriptive.items() %}
+                <td><span class="mono small">{{ "%.4f"|format(vals[metric]) if vals[metric] is not none else "—" }}</span></td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Correlations -->
+    {% if summary.stats.top_correlations %}
+    <div class="portal-card mb-4">
+      <div class="portal-card-header"><i class="fas fa-link me-2"></i>Top Correlations</div>
+      <div class="portal-card-body">
+        {% for pair in summary.stats.top_correlations %}
+        <div class="ref-row">
+          <span class="mono">{{ pair.col1 }} ↔ {{ pair.col2 }}</span>
+          <span class="mono {% if pair.correlation|abs > 0.7 %}text-success{% elif pair.correlation|abs > 0.4 %}text-warning{% else %}text-muted{% endif %}">
+            {{ "%.4f"|format(pair.correlation) }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- ML Results -->
+    {% if summary.ml and summary.ml.r2_score is defined %}
+    <div class="portal-card mb-4">
+      <div class="portal-card-header"><i class="fas fa-brain me-2"></i>Machine Learning Results</div>
+      <div class="portal-card-body">
+        <div class="row g-3 mb-4">
+          <div class="col-md-3 text-center">
+            <div class="mono text-accent" style="font-size:1.8rem">{{ summary.ml.model }}</div>
+            <div class="text-muted small">Model</div>
+          </div>
+          <div class="col-md-3 text-center">
+            <div class="mono text-accent" style="font-size:1.8rem">{{ summary.ml.r2_score }}</div>
+            <div class="text-muted small">R² Score</div>
+          </div>
+          <div class="col-md-3 text-center">
+            <div class="mono text-accent" style="font-size:1.8rem">{{ summary.ml.rmse }}</div>
+            <div class="text-muted small">RMSE</div>
+          </div>
+          <div class="col-md-3 text-center">
+            <div class="mono text-accent" style="font-size:1.8rem">{{ summary.ml.target_column }}</div>
+            <div class="text-muted small">Target Column</div>
+          </div>
+        </div>
+
+        {% if summary.ml.feature_importance %}
+        <div class="portal-card-header mb-3" style="border-radius:8px">Feature Importance</div>
+        {% for feat in summary.ml.feature_importance[:6] %}
+        <div class="mb-2">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="mono small">{{ feat.feature }}</span>
+            <span class="mono small text-accent">{{ "%.4f"|format(feat.importance) }}</span>
+          </div>
+          <div class="progress portal-progress" style="height:6px">
+            <div class="progress-bar bg-accent"
+                 style="width: {{ (feat.importance * 100)|round }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Charts -->
+    {% if summary.charts %}
+    <div class="portal-card mb-4">
+      <div class="portal-card-header"><i class="fas fa-images me-2"></i>Charts</div>
+      <div class="portal-card-body">
+        <div class="row g-3">
+          {% for chart in summary.charts %}
+          <div class="col-md-6">
+            <div class="chart-wrapper">
+              <img src="/static/results/{{ chart.file }}"
+                   alt="{{ chart.type }}"
+                   class="img-fluid rounded"
+                   style="width:100%; border:1px solid var(--border)"/>
+              <p class="mono small text-muted text-center mt-1">
+                {{ chart.type }} — {{ chart.column }}
+              </p>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="mt-2">
+      <a href="{{ url_for('jobs.dashboard') }}" class="btn btn-ghost btn-sm">
+        <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

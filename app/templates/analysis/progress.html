@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Processing — Research Cloud Portal{% endblock %}
+
+{% block content %}
+<div class="portal-page">
+  <div class="container-fluid px-4 py-4">
+    <div class="page-header mb-4">
+      <h2 class="page-title"><i class="fas fa-cog fa-spin me-2 text-accent"></i>Processing Dataset</h2>
+      <p class="page-sub">Your data is being analyzed in the background</p>
+    </div>
+
+    <div class="row justify-content-center">
+      <div class="col-lg-6">
+        <div class="portal-card text-center p-4">
+
+          <!-- Animated Icon -->
+          <div class="processing-icon mb-4">
+            <i class="fas fa-brain" id="proc-icon"></i>
+          </div>
+
+          <!-- Step Text -->
+          <p class="mono text-accent mb-3" id="step-text">Waiting in queue...</p>
+
+          <!-- Progress Bar -->
+          <div class="progress portal-progress mb-2">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 id="progress-bar" role="progressbar"
+                 style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            </div>
+          </div>
+          <p class="mono text-muted small mb-4" id="percent-text">0%</p>
+
+          <!-- Steps Timeline -->
+          <div class="steps-timeline text-start">
+            <div class="step-item" id="step-read">
+              <i class="fas fa-circle-notch fa-spin step-icon text-muted"></i>
+              <span>Reading dataset</span>
+            </div>
+            <div class="step-item" id="step-clean">
+              <i class="fas fa-circle step-icon text-muted"></i>
+              <span>Cleaning data</span>
+            </div>
+            <div class="step-item" id="step-stats">
+              <i class="fas fa-circle step-icon text-muted"></i>
+              <span>Statistical analysis</span>
+            </div>
+            <div class="step-item" id="step-charts">
+              <i class="fas fa-circle step-icon text-muted"></i>
+              <span>Generating charts</span>
+            </div>
+            <div class="step-item" id="step-ml">
+              <i class="fas fa-circle step-icon text-muted"></i>
+              <span>Training ML model</span>
+            </div>
+            <div class="step-item" id="step-save">
+              <i class="fas fa-circle step-icon text-muted"></i>
+              <span>Saving results</span>
+            </div>
+          </div>
+
+          <!-- Done button (hidden until complete) -->
+          <a href="{{ url_for('analysis.results', job_id=job_id) }}"
+             class="btn btn-launch w-100 mt-4 d-none" id="view-results-btn">
+            <i class="fas fa-chart-bar me-2"></i>View Results
+          </a>
+
+          <!-- Error message (hidden) -->
+          <div class="alert portal-alert portal-alert-danger mt-3 d-none" id="error-msg"></div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TASK_ID = "{{ task_id }}";
+const JOB_ID  = "{{ job_id }}";
+
+// Map percent → which step to highlight
+const stepMap = [
+  [0,  15,  "step-read"],
+  [15, 35,  "step-clean"],
+  [35, 55,  "step-stats"],
+  [55, 75,  "step-charts"],
+  [75, 90,  "step-ml"],
+  [90, 100, "step-save"],
+];
+
+function markStep(percent) {
+  stepMap.forEach(([from, to, id]) => {
+    const el   = document.getElementById(id);
+    const icon = el.querySelector('.step-icon');
+    if (percent >= to) {
+      icon.className = 'fas fa-check-circle step-icon text-success';
+    } else if (percent >= from) {
+      icon.className = 'fas fa-circle-notch fa-spin step-icon text-accent';
+    } else {
+      icon.className = 'fas fa-circle step-icon text-muted';
+    }
+  });
+}
+
+function poll() {
+  fetch(`/analysis/status/${TASK_ID}`)
+    .then(r => r.json())
+    .then(data => {
+      const bar  = document.getElementById('progress-bar');
+      const pct  = data.percent || 0;
+
+      bar.style.width      = pct + '%';
+      bar.setAttribute('aria-valuenow', pct);
+      document.getElementById('percent-text').textContent = pct + '%';
+      document.getElementById('step-text').textContent    = data.step || '...';
+      markStep(pct);
+
+      if (data.state === 'SUCCESS') {
+        bar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+        bar.classList.add('bg-success');
+        document.getElementById('proc-icon').className = 'fas fa-check-circle text-success';
+        document.getElementById('view-results-btn').classList.remove('d-none');
+        markStep(100);
+        return; // stop polling
+      }
+
+      if (data.state === 'FAILURE') {
+        bar.classList.add('bg-danger');
+        document.getElementById('error-msg').classList.remove('d-none');
+        document.getElementById('error-msg').textContent = 'Processing failed: ' + data.step;
+        return;
+      }
+
+      // keep polling every 2 seconds
+      setTimeout(poll, 2000);
+    })
+    .catch(() => setTimeout(poll, 3000));
+}
+
+// Start polling
+poll();
+</script>
+{% endblock %}

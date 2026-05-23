@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% block title %}Launch Research Job — Research Cloud Portal{% endblock %}
+
+{% block content %}
+<div class="portal-page">
+  <div class="container-fluid px-4 py-4">
+
+    <div class="page-header mb-4">
+      <h2 class="page-title">
+        <i class="fas fa-rocket me-2 text-accent"></i>Launch Research Job
+      </h2>
+      <p class="page-sub">Provision a VM, install your stack, and run your analysis — all in one submission</p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('jobs.launch') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <div class="row g-4">
+
+        <!-- ── Left column: all config ───────────────────────────────────── -->
+        <div class="col-lg-8">
+
+          <!-- STEP 01: OS Image -->
+          <div class="portal-card mb-4">
+            <div class="portal-card-header">
+              <span class="step-num">01</span>
+              <i class="fas fa-compact-disc me-2"></i>Operating System
+              <span class="ms-auto mono text-xs text-accent2">Template #14 always used</span>
+            </div>
+            <div class="portal-card-body">
+              <div class="os-grid">
+                {% for key, img in os_templates.items() %}
+                <label class="os-option" for="os-{{ key }}">
+                  <input type="radio" name="os_image" id="os-{{ key }}" value="{{ key }}"
+                         class="os-radio" {% if key == 'ubuntu-22' %}checked{% endif %} required/>
+                  <div class="os-card">
+                    <div class="os-icon">{{ img.icon }}</div>
+                    <div class="os-name">{{ img.name }}</div>
+                    <div class="os-tid mono">TPL #{{ img.template_id }}</div>
+                  </div>
+                </label>
+                {% endfor %}
+              </div>
+              <p class="mt-3 mb-0" style="font-size:11px;color:var(--text-3);">
+                <i class="fas fa-info-circle me-1"></i>
+                All OS options provision from Template&nbsp;14 (Ubuntu 22.04 LTS Fixed) — the only
+                template currently confirmed to boot on this cluster.
+              </p>
+            </div>
+          </div>
+
+          <!-- STEP 02: Compute -->
+          <div class="portal-card mb-4">
+            <div class="portal-card-header">
+              <span class="step-num">02</span>
+              <i class="fas fa-microchip me-2"></i>Compute Configuration
+            </div>
+            <div class="portal-card-body">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="portal-label">CPU Cores</label>
+                  <select name="cpu" class="form-select portal-select" id="sel-cpu">
+                    <option value="1">1 vCPU</option>
+                    <option value="2" selected>2 vCPU</option>
+                    <option value="4">4 vCPU</option>
+                    <option value="8">8 vCPU</option>
+                    <option value="16">16 vCPU</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="portal-label">RAM</label>
+                  <select name="ram" class="form-select portal-select" id="sel-ram">
+                    <option value="2">2 GB</option>
+                    <option value="4" selected>4 GB</option>
+                    <option value="8">8 GB</option>
+                    <option value="16">16 GB</option>
+                    <option value="32">32 GB</option>
+                    <option value="64">64 GB</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="portal-label">GPU</label>
+                  <select name="gpu" class="form-select portal-select" id="sel-gpu">
+                    <option value="none" selected>None (CPU only)</option>
+                    <option value="nvidia-t4">NVIDIA T4 (16 GB)</option>
+                    <option value="nvidia-a100">NVIDIA A100 (80 GB)</option>
+                    <option value="amd-mi250">AMD MI250X</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 03: Task Type / Software Stack -->
+          <div class="portal-card mb-4">
+            <div class="portal-card-header">
+              <span class="step-num">03</span>
+              <i class="fas fa-layer-group me-2"></i>Analysis Stack
+            </div>
+            <div class="portal-card-body">
+              <div class="row g-3">
+                {% for key, sw in software_stacks.items() %}
+                <div class="col-md-6">
+                  <label class="sw-option" for="sw-{{ key }}">
+                    <input type="radio" name="software" id="sw-{{ key }}" value="{{ key }}"
+                           class="sw-radio" {% if key == 'python-ds' %}checked{% endif %} required/>
+                    <div class="sw-card">
+                      <div class="d-flex align-items-center gap-2 mb-1">
+                        <div class="sw-name">{{ sw.name }}</div>
+                        {% if key == 'mapreduce' %}
+                        <span class="badge" style="font-size:9px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,179,71,.2);border-radius:4px;padding:1px 6px;">Soon</span>
+                        {% endif %}
+                      </div>
+                      <div class="sw-pkgs mono">{{ sw.packages }}</div>
+                    </div>
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 04: Dataset Upload -->
+          <div class="portal-card mb-4">
+            <div class="portal-card-header">
+              <span class="step-num">04</span>
+              <i class="fas fa-file-arrow-up me-2"></i>Dataset
+              <span class="badge bg-danger ms-2" style="font-size:9px;">Required</span>
+            </div>
+            <div class="portal-card-body">
+              <div class="upload-zone" id="upload-zone">
+                <i class="fas fa-cloud-arrow-up upload-icon"></i>
+                <p class="upload-text">
+                  Drop your CSV or
+                  <label for="dataset-input" class="upload-link" style="cursor:pointer;">browse</label>
+                </p>
+                <p class="upload-sub">CSV · TXT · max 16 MB</p>
+                <input type="file" name="dataset" id="dataset-input"
+                       accept=".csv,.txt" class="d-none" required/>
+                <div id="file-preview" class="file-preview d-none mt-3">
+                  <i class="fas fa-file-csv me-2 text-accent2"></i>
+                  <span id="file-name" class="mono"></span>
+                  <span id="file-size" class="ms-2" style="color:var(--text-3);font-size:11px;"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 05: Options -->
+          <div class="portal-card">
+            <div class="portal-card-header">
+              <span class="step-num">05</span>
+              <i class="fas fa-sliders me-2"></i>Options
+            </div>
+            <div class="portal-card-body">
+              <div class="d-flex align-items-center gap-3">
+                <label class="d-flex align-items-center gap-2" style="cursor:pointer;">
+                  <input type="checkbox" name="keep_vm" value="1"
+                         class="form-check-input mt-0" id="chk-keep-vm"
+                         style="width:16px;height:16px;background:var(--surface-3);border-color:var(--border-bright);"/>
+                  <span style="font-size:13px;">Keep VM alive after job completes</span>
+                </label>
+                <span style="font-size:11px;color:var(--text-3);">
+                  (VM will accumulate resource hours — terminate manually from dashboard)
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /col-lg-8 -->
+
+        <!-- ── Right column: sticky summary ─────────────────────────────── -->
+        <div class="col-lg-4">
+          <div class="portal-card sticky-top" style="top:74px;">
+            <div class="portal-card-header">
+              <i class="fas fa-clipboard-list me-2"></i>Job Summary
+            </div>
+            <div class="portal-card-body">
+
+              <div class="summary-row">
+                <span class="summary-label">OS</span>
+                <span class="summary-val mono" id="sum-os">Ubuntu 22.04 LTS</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">vCPU</span>
+                <span class="summary-val mono" id="sum-cpu">2</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">RAM</span>
+                <span class="summary-val mono" id="sum-ram">4 GB</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">GPU</span>
+                <span class="summary-val mono" id="sum-gpu">None</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Stack</span>
+                <span class="summary-val mono" id="sum-sw">Python / DS</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Dataset</span>
+                <span class="summary-val mono" id="sum-ds" style="color:var(--text-3);">None selected</span>
+              </div>
+
+              <hr class="border-secondary my-3"/>
+
+              <!-- Pipeline preview -->
+              <p style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;
+                         color:var(--text-3);font-weight:600;margin-bottom:10px;">
+                Pipeline
+              </p>
+              <div class="pipeline-steps">
+                <div class="pipe-step"><i class="fas fa-server pipe-icon"></i><span>Provision VM (template 14)</span></div>
+                <div class="pipe-step"><i class="fas fa-hard-drive pipe-icon"></i><span>Resize disk → 10 GB</span></div>
+                <div class="pipe-step"><i class="fas fa-terminal pipe-icon"></i><span>Bootstrap + install libs</span></div>
+                <div class="pipe-step"><i class="fas fa-upload pipe-icon"></i><span>Upload dataset via SCP</span></div>
+                <div class="pipe-step"><i class="fas fa-flask pipe-icon"></i><span>Run analysis on VM</span></div>
+                <div class="pipe-step"><i class="fas fa-download pipe-icon"></i><span>Fetch results → portal</span></div>
+                <div class="pipe-step" id="pipe-terminate">
+                  <i class="fas fa-stop-circle pipe-icon"></i><span>Terminate VM</span>
+                </div>
+              </div>
+
+              <hr class="border-secondary my-3"/>
+
+              <button type="submit" class="btn btn-launch w-100 py-2" id="btn-launch">
+                <i class="fas fa-rocket me-2"></i>Launch &amp; Analyze
+              </button>
+              <a href="{{ url_for('jobs.dashboard') }}" class="btn btn-ghost w-100 mt-2">
+                Cancel
+              </a>
+            </div>
+          </div>
+        </div><!-- /col-lg-4 -->
+
+      </div><!-- /row -->
+    </form>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.pipeline-steps { display:flex; flex-direction:column; gap:6px; }
+.pipe-step {
+  display:flex; align-items:center; gap:8px;
+  font-size:11px; color:var(--text-2);
+  padding:5px 8px; border-radius:var(--r-sm);
+  background:var(--surface-2); border:1px solid var(--border);
+}
+.pipe-icon { color:var(--cyan); font-size:10px; width:12px; text-align:center; }
+.portal-label { font-size:11px; color:var(--text-3); font-weight:600;
+                 text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; display:block; }
+.portal-select { background:var(--surface-2); border:1px solid var(--border);
+                  color:var(--text); font-size:13px; border-radius:var(--r-sm); }
+.portal-select:focus { border-color:var(--cyan); box-shadow:0 0 0 2px var(--cyan-dim); background:var(--surface-2); color:var(--text); }
+.summary-row { display:flex; justify-content:space-between; align-items:center;
+                padding:7px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.summary-row:last-of-type { border-bottom:none; }
+.summary-label { color:var(--text-3); font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+.summary-val { color:var(--text); }
+.upload-zone {
+  border:2px dashed var(--border-bright); border-radius:var(--r-lg);
+  padding:32px 20px; text-align:center; cursor:pointer;
+  transition:all .2s; background:var(--surface-2);
+}
+.upload-zone.drag-over { border-color:var(--cyan); background:var(--cyan-dim); }
+.upload-icon { font-size:28px; color:var(--text-3); display:block; margin-bottom:12px; }
+.upload-text { font-size:13px; color:var(--text-2); margin-bottom:4px; }
+.upload-link { color:var(--cyan); text-decoration:underline; }
+.upload-sub { font-size:11px; color:var(--text-3); }
+.file-preview { font-size:13px; color:var(--emerald); }
+.text-xs { font-size:10px; }
+</style>
+
+<script>
+// ── Summary sync ────────────────────────────────────────────────────────────
+document.querySelectorAll('.os-radio').forEach(r => r.addEventListener('change', () => {
+  document.getElementById('sum-os').textContent =
+    r.closest('.os-option').querySelector('.os-name').textContent;
+}));
+document.getElementById('sel-cpu').addEventListener('change', e =>
+  document.getElementById('sum-cpu').textContent = e.target.value);
+document.getElementById('sel-ram').addEventListener('change', e =>
+  document.getElementById('sum-ram').textContent = e.target.value + ' GB');
+document.getElementById('sel-gpu').addEventListener('change', e =>
+  document.getElementById('sum-gpu').textContent = e.target.options[e.target.selectedIndex].text);
+document.querySelectorAll('.sw-radio').forEach(r => r.addEventListener('change', () => {
+  document.getElementById('sum-sw').textContent =
+    r.closest('.sw-option').querySelector('.sw-name').textContent;
+}));
+
+// ── Keep-VM toggle — update pipeline preview ────────────────────────────────
+document.getElementById('chk-keep-vm').addEventListener('change', function() {
+  const step = document.getElementById('pipe-terminate');
+  if (this.checked) {
+    step.style.opacity = '.35';
+    step.querySelector('span').textContent = 'VM kept alive (manual terminate)';
+  } else {
+    step.style.opacity = '1';
+    step.querySelector('span').textContent = 'Terminate VM';
+  }
+});
+
+// ── Dataset file picker ─────────────────────────────────────────────────────
+const input   = document.getElementById('dataset-input');
+const zone    = document.getElementById('upload-zone');
+const preview = document.getElementById('file-preview');
+
+function showFile(file) {
+  if (!file) return;
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-size').textContent =
+    '(' + (file.size / 1024).toFixed(1) + ' KB)';
+  preview.classList.remove('d-none');
+  document.getElementById('sum-ds').textContent   = file.name;
+  document.getElementById('sum-ds').style.color   = 'var(--emerald)';
+}
+
+input.addEventListener('change', () => showFile(input.files[0]));
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) {
+    // Assign to file input
+    const dt = new DataTransfer();
+    dt.items.add(e.dataTransfer.files[0]);
+    input.files = dt.files;
+    showFile(input.files[0]);
+  }
+});
+
+// ── Prevent double-submit ───────────────────────────────────────────────────
+document.querySelector('form').addEventListener('submit', () => {
+  const btn = document.getElementById('btn-launch');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Submitting…';
+});
+</script>
+{% endblock %}

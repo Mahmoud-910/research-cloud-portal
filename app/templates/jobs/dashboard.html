@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Research Cloud Portal{% endblock %}
+
+{% block content %}
+<div class="portal-page">
+  <div class="container-fluid px-4 py-4">
+
+    <div class="page-header mb-4 d-flex align-items-center justify-content-between">
+      <div>
+        <h2 class="page-title">
+          <i class="fas fa-gauge-high me-2 text-accent"></i>
+          {% if is_admin %}Admin Dashboard{% else %}Research Dashboard{% endif %}
+        </h2>
+        <p class="page-sub">
+          {% if is_admin %}Viewing all jobs across all researchers
+          {% else %}Monitor your virtual machines and download results{% endif %}
+        </p>
+      </div>
+      <a href="{{ url_for('jobs.launch') }}" class="btn btn-launch">
+        <i class="fas fa-plus me-2"></i>Launch New VM
+      </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+      {% set total   = jobs|length %}
+      {% set running = jobs|selectattr('status','in',['running','booting','bootstrapping','waiting_ssh','uploading','provisioning','resizing_disk'])|list|length %}
+      {% set done    = jobs|selectattr('status','equalto','completed')|list|length %}
+      {% set sim     = jobs|selectattr('simulated')|list|length %}
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon"><i class="fas fa-server"></i></div>
+          <div class="stat-val">{{ total }}</div>
+          <div class="stat-lbl">Total Jobs</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card stat-running">
+          <div class="stat-icon"><i class="fas fa-play-circle"></i></div>
+          <div class="stat-val">{{ running }}</div>
+          <div class="stat-lbl">Running</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card stat-done">
+          <div class="stat-icon"><i class="fas fa-circle-check"></i></div>
+          <div class="stat-val">{{ done }}</div>
+          <div class="stat-lbl">Completed</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card stat-sim">
+          <div class="stat-icon"><i class="fas fa-microchip"></i></div>
+          <div class="stat-val">{{ sim }}</div>
+          <div class="stat-lbl">Simulated</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Jobs Table -->
+    <div class="portal-card">
+      <div class="portal-card-header">
+        <i class="fas fa-list-check me-2"></i>
+        {% if is_admin %}All VM Jobs{% else %}Your VM Jobs{% endif %}
+        <span class="badge bg-secondary ms-2 mono">{{ total }}</span>
+      </div>
+      <div class="portal-card-body p-0">
+        {% if jobs %}
+        <div class="table-responsive">
+          <table class="table portal-table mb-0">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>VM ID</th>
+                {% if is_admin %}<th>User</th>{% endif %}
+                <th>OS</th>
+                <th>Software</th>
+                <th>Specs</th>
+                <th>Status</th>
+                <th>Dataset</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for job in jobs %}
+              <tr data-job-id="{{ job.job_id }}">
+                <td><span class="mono text-accent">#{{ job.job_id }}</span></td>
+                <td>
+                  <span class="mono text-muted">{{ job.vm_id }}</span>
+                  {% if job.simulated %}<span class="badge sim-badge ms-1">SIM</span>{% endif %}
+                </td>
+                {% if is_admin %}
+                <td><span class="mono small text-muted">{{ job.owner.username }}</span></td>
+                {% endif %}
+                <td><span class="os-badge">{{ job.os_icon }} {{ job.os_label }}</span></td>
+                <td><span class="sw-badge">{{ job.sw_label }}</span></td>
+                <td>
+                  <span class="mono small">
+                    <i class="fas fa-microchip me-1 text-muted"></i>{{ job.cpu }}vCPU
+                    &nbsp;
+                    <i class="fas fa-memory me-1 text-muted"></i>{{ job.ram }}GB
+                  </span>
+                </td>
+                <td>
+                  <span class="status-badge status-{{ job.status.lower() }}" id="status-{{ job.job_id }}">
+                    <i class="status-dot"></i>{{ job.status }}
+                  </span>
+                </td>
+                <td>
+                  {% if job.dataset %}
+                  <span class="mono small text-success"><i class="fas fa-file-csv me-1"></i>Uploaded</span>
+                  {% else %}
+                  <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="d-flex gap-2">
+                    <a href="{{ url_for('jobs.download_result', job_id=job.job_id) }}"
+                       class="btn btn-result btn-sm {% if not job.result_file %}disabled{% endif %}"
+                       id="dl-{{ job.job_id }}">
+                      <i class="fas fa-download me-1"></i>Results
+                    </a>
+                    <form method="POST" action="{{ url_for('jobs.terminate_vm', job_id=job.job_id) }}" class="d-inline"
+                          onsubmit="return confirm('Terminate VM #{{ job.job_id }}?')">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      <button type="submit" class="btn btn-terminate btn-sm"
+                              {% if job.status == 'TERMINATED' %}disabled{% endif %}>
+                        <i class="fas fa-stop"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state py-5">
+          <i class="fas fa-cloud-arrow-up"></i>
+          <p>No VM jobs yet.</p>
+          <a href="{{ url_for('jobs.launch') }}" class="btn btn-launch btn-sm mt-2">
+            <i class="fas fa-plus me-1"></i>Launch Your First VM
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Quick Reference -->
+    <div class="row g-3 mt-2">
+      <div class="col-md-6">
+        <div class="portal-card h-100">
+          <div class="portal-card-header"><i class="fas fa-desktop me-2"></i>Available OS Images</div>
+          <div class="portal-card-body">
+            {% for key, img in os_templates.items() %}
+            <div class="ref-row">
+              <span>{{ img.icon }} {{ img.name }}</span>
+              <span class="mono text-muted small">ID: {{ img.template_id }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="portal-card h-100">
+          <div class="portal-card-header"><i class="fas fa-layer-group me-2"></i>Software Stacks</div>
+          <div class="portal-card-body">
+            {% for key, sw in software_stacks.items() %}
+            <div class="ref-row">
+              <span>{{ sw.name }}</span>
+              <span class="mono text-muted small">{{ sw.packages[:30] }}…</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const jobIds = {{ jobs|map(attribute='job_id')|list|tojson }};
+function refreshStatuses() {
+  jobIds.forEach(jid => {
+    fetch(`/status/${jid}`)
+      .then(r => r.json())
+      .then(data => {
+        const badge = document.getElementById(`status-${jid}`);
+        const dlBtn = document.getElementById(`dl-${jid}`);
+        if (badge) {
+          badge.className = `status-badge status-${data.status.toLowerCase()}`;
+          badge.innerHTML = `<i class="status-dot"></i>${data.status}`;
+        }
+        if (dlBtn && data.has_result) dlBtn.classList.remove('disabled');
+      }).catch(() => {});
+  });
+}
+if (jobIds.length > 0) setInterval(refreshStatuses, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% block title %}Results — Job {{ job.job_id }}{% endblock %}
+
+{% block content %}
+<div class="portal-page">
+  <div class="container-fluid px-4 py-4">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+      <a href="{{ url_for('jobs.dashboard') }}" class="btn btn-ghost btn-sm">
+        <i class="fas fa-arrow-left me-1"></i>Dashboard
+      </a>
+      <div>
+        <h2 class="page-title mb-0">
+          <i class="fas fa-chart-bar me-2 text-accent"></i>Analysis Results
+        </h2>
+        <p class="page-sub mb-0">
+          Job <span class="mono text-accent">{{ job.job_id }}</span>
+          · {{ job.sw_label or job.software }}
+          {% if job.vm_ip %} · VM <span class="mono">{{ job.vm_ip }}</span>{% endif %}
+        </p>
+      </div>
+      <div class="ms-auto d-flex gap-2">
+        <a href="{{ url_for('jobs.download_result', job_id=job.job_id) }}"
+           class="btn btn-outline-secondary btn-sm">
+          <i class="fas fa-download me-1"></i>Download CSV
+        </a>
+        <a href="{{ url_for('jobs.job_progress', job_id=job.job_id) }}"
+           class="btn btn-ghost btn-sm">
+          <i class="fas fa-timeline me-1"></i>Pipeline Log
+        </a>
+      </div>
+    </div>
+
+    {% if not summary %}
+    <div class="portal-card">
+      <div class="portal-card-body text-center py-5">
+        <i class="fas fa-triangle-exclamation fa-2x mb-3" style="color:var(--amber);"></i>
+        <p style="color:var(--text-2);">No results found for this job.</p>
+      </div>
+    </div>
+    {% else %}
+
+    <!-- ── Overview row ──────────────────────────────────────────────────── -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="metric-card">
+          <div class="metric-icon" style="color:var(--cyan);"><i class="fas fa-table-cells"></i></div>
+          <div class="metric-val">{{ summary.rows | default('—') }}</div>
+          <div class="metric-label">Rows</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="metric-card">
+          <div class="metric-icon" style="color:var(--purple);"><i class="fas fa-columns"></i></div>
+          <div class="metric-val">{{ summary.columns | default('—') }}</div>
+          <div class="metric-label">Columns</div>
+        </div>
+      </div>
+      {% if summary.cleaning %}
+      <div class="col-6 col-md-3">
+        <div class="metric-card">
+          <div class="metric-icon" style="color:var(--emerald);"><i class="fas fa-broom"></i></div>
+          <div class="metric-val">{{ summary.cleaning.missing_filled | default(0) }}</div>
+          <div class="metric-label">Missing Filled</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="metric-card">
+          <div class="metric-icon" style="color:var(--amber);"><i class="fas fa-copy"></i></div>
+          <div class="metric-val">{{ summary.cleaning.duplicates_removed | default(0) }}</div>
+          <div class="metric-label">Duplicates Removed</div>
+        </div>
+      </div>
+      {% endif %}
+      {% if summary.ml %}
+      <div class="col-6 col-md-3">
+        <div class="metric-card">
+          <div class="metric-icon" style="color:var(--cyan);"><i class="fas fa-brain"></i></div>
+          <div class="metric-val">{{ summary.ml.r2 }}</div>
+          <div class="metric-label">R² Score</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="metric-card">
+          <div class="metric-icon" style="color:var(--purple);"><i class="fas fa-bullseye"></i></div>
+          <div class="metric-val">{{ summary.ml.rmse }}</div>
+          <div class="metric-label">RMSE</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-8">
+
+        <!-- ── Charts ──────────────────────────────────────────────────── -->
+        {% if charts %}
+        <div class="portal-card mb-4">
+          <div class="portal-card-header">
+            <i class="fas fa-chart-line me-2"></i>Charts
+            <span class="ms-auto text-xs text-muted mono">{{ charts | length }} generated</span>
+          </div>
+          <div class="portal-card-body">
+            <div class="charts-grid">
+              {% for chart in charts %}
+              <div class="chart-item">
+                <p class="chart-caption">
+                  {{ chart.type | title }}
+                  {% if chart.column != 'all' %} — <span class="mono">{{ chart.column }}</span>{% endif %}
+                </p>
+                <img src="{{ url_for('static', filename='results/' ~ chart.file) }}"
+                     alt="{{ chart.type }} chart"
+                     class="chart-img"
+                     loading="lazy"
+                     onerror="this.closest('.chart-item').style.display='none'"/>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- ── Descriptive Statistics ─────────────────────────────────── -->
+        {% if summary.stats %}
+        <div class="portal-card mb-4">
+          <div class="portal-card-header">
+            <i class="fas fa-sigma me-2"></i>Descriptive Statistics
+          </div>
+          <div class="portal-card-body p-0">
+            <div class="table-responsive">
+              <table class="portal-table">
+                <thead>
+                  <tr>
+                    <th>Statistic</th>
+                    {% for col in summary.stats.keys() %}
+                    <th class="mono">{{ col }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% set stat_keys = ['count','mean','std','min','25%','50%','75%','max'] %}
+                  {% for stat in stat_keys %}
+                  <tr>
+                    <td class="mono text-accent2">{{ stat }}</td>
+                    {% for col, vals in summary.stats.items() %}
+                    <td class="mono">
+                      {% if vals[stat] is defined %}
+                        {{ "%.4f" | format(vals[stat] | float) }}
+                      {% else %}—{% endif %}
+                    </td>
+                    {% endfor %}
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- ── ML Feature Importance ──────────────────────────────────── -->
+        {% if summary.ml and summary.ml.feature_importance %}
+        <div class="portal-card mb-4">
+          <div class="portal-card-header">
+            <i class="fas fa-brain me-2"></i>ML Model — Feature Importance
+            <span class="ms-auto mono text-xs text-muted">
+              Target: <span class="text-accent">{{ summary.ml.target }}</span>
+            </span>
+          </div>
+          <div class="portal-card-body">
+            {% for feat in summary.ml.feature_importance %}
+            <div class="feat-row">
+              <div class="feat-name mono">{{ feat.feature }}</div>
+              <div class="feat-bar-wrap">
+                <div class="feat-bar" style="width:{{ (feat.importance * 100) | round(1) }}%;"></div>
+              </div>
+              <div class="feat-val mono">{{ "%.4f" | format(feat.importance) }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+
+      <div class="col-lg-4">
+
+        <!-- ── Column overview ───────────────────────────────────────── -->
+        {% if summary.column_names %}
+        <div class="portal-card mb-4">
+          <div class="portal-card-header">
+            <i class="fas fa-list-ul me-2"></i>Columns
+            <span class="ms-auto mono text-xs text-muted">{{ summary.column_names | length }}</span>
+          </div>
+          <div class="portal-card-body p-0">
+            <ul class="col-list">
+              {% for col in summary.column_names %}
+              <li class="col-item">
+                <span class="mono col-name">{{ col }}</span>
+                {% if summary.dtypes and summary.dtypes[col] is defined %}
+                <span class="mono col-dtype">{{ summary.dtypes[col] }}</span>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- ── Top correlations ──────────────────────────────────────── -->
+        {% if summary.top_correlations %}
+        <div class="portal-card mb-4">
+          <div class="portal-card-header">
+            <i class="fas fa-arrows-left-right me-2"></i>Top Correlations
+          </div>
+          <div class="portal-card-body p-0">
+            <ul class="corr-list">
+              {% for pair in summary.top_correlations %}
+              {% set r = pair.r | default(pair.correlation) | float %}
+              <li class="corr-item">
+                <span class="mono corr-cols">{{ pair.col1 }} ↔ {{ pair.col2 }}</span>
+                <span class="mono corr-val {% if r | abs > 0.7 %}strong{% elif r | abs > 0.4 %}medium{% endif %}">
+                  {{ "%.4f" | format(r) }}
+                </span>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- ── Job metadata ──────────────────────────────────────────── -->
+        <div class="portal-card">
+          <div class="portal-card-header"><i class="fas fa-circle-info me-2"></i>Job Info</div>
+          <div class="portal-card-body">
+            <div class="summary-row"><span class="summary-label">Job ID</span>
+              <span class="summary-val mono">{{ job.job_id }}</span></div>
+            <div class="summary-row"><span class="summary-label">Status</span>
+              <span class="summary-val mono text-emerald">{{ job.status }}</span></div>
+            <div class="summary-row"><span class="summary-label">VM ID</span>
+              <span class="summary-val mono">{{ job.vm_id or '—' }}</span></div>
+            <div class="summary-row"><span class="summary-label">VM IP</span>
+              <span class="summary-val mono">{{ job.vm_ip or '—' }}</span></div>
+            <div class="summary-row"><span class="summary-label">Stack</span>
+              <span class="summary-val mono">{{ job.sw_label or job.software }}</span></div>
+            <div class="summary-row"><span class="summary-label">Dataset</span>
+              <span class="summary-val mono" style="font-size:11px;">
+                {{ job.dataset | truncate(28) if job.dataset else '—' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Metric cards ──────────────────────────────────────────────── */
+.metric-card {
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:var(--r-lg); padding:18px 16px;
+  display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+}
+.metric-icon { font-size:18px; margin-bottom:4px; }
+.metric-val   { font-size:28px; font-weight:700; color:var(--text); line-height:1; font-family:var(--font-mono); }
+.metric-label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--text-3); font-weight:600; }
+
+/* ── Charts grid ───────────────────────────────────────────────── */
+.charts-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+.chart-item { }
+.chart-caption { font-size:11px; color:var(--text-3); margin-bottom:8px; text-transform:capitalize; }
+.chart-img { width:100%; border-radius:var(--r-sm); border:1px solid var(--border); display:block; }
+
+/* ── Portal table ──────────────────────────────────────────────── */
+.portal-table { width:100%; border-collapse:collapse; font-size:12px; }
+.portal-table th {
+  background:var(--surface-3); color:var(--text-3);
+  font-size:9px; text-transform:uppercase; letter-spacing:.5px;
+  padding:10px 14px; border-bottom:1px solid var(--border);
+  font-weight:600; white-space:nowrap;
+}
+.portal-table td {
+  padding:9px 14px; border-bottom:1px solid var(--border);
+  color:var(--text); white-space:nowrap;
+}
+.portal-table tbody tr:hover { background:var(--surface-2); }
+.portal-table tbody tr:last-child td { border-bottom:none; }
+
+/* ── Feature importance bars ───────────────────────────────────── */
+.feat-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.feat-name { font-size:11px; color:var(--text-2); width:130px; flex-shrink:0;
+             overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.feat-bar-wrap { flex:1; background:var(--surface-3); border-radius:3px; height:6px; overflow:hidden; }
+.feat-bar { height:100%; background:linear-gradient(90deg,var(--cyan),var(--emerald));
+             border-radius:3px; transition:width .6s ease; min-width:2px; }
+.feat-val { font-size:11px; color:var(--text-3); width:52px; text-align:right; flex-shrink:0; }
+
+/* ── Column list ───────────────────────────────────────────────── */
+.col-list { list-style:none; padding:0; margin:0; }
+.col-item  { display:flex; justify-content:space-between; align-items:center;
+              padding:8px 14px; border-bottom:1px solid var(--border); font-size:12px; }
+.col-item:last-child { border-bottom:none; }
+.col-name  { color:var(--text); }
+.col-dtype { color:var(--text-3); font-size:10px; }
+
+/* ── Correlation list ──────────────────────────────────────────── */
+.corr-list { list-style:none; padding:0; margin:0; }
+.corr-item { display:flex; justify-content:space-between; align-items:center;
+              padding:8px 14px; border-bottom:1px solid var(--border); font-size:11px; }
+.corr-item:last-child { border-bottom:none; }
+.corr-cols { color:var(--text-2); font-size:10px; }
+.corr-val  { color:var(--text-3); }
+.corr-val.strong { color:var(--cyan); }
+.corr-val.medium { color:var(--amber); }
+
+/* ── Summary rows (job meta card) ──────────────────────────────── */
+.summary-row { display:flex; justify-content:space-between; align-items:center;
+                padding:7px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.summary-row:last-child { border-bottom:none; }
+.summary-label { font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); font-weight:600; }
+.summary-val   { color:var(--text); }
+.text-emerald  { color:var(--emerald); }
+.text-xs       { font-size:10px; }
+</style>
+{% endblock %}

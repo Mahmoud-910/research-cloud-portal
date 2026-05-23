@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}MATLAB / Octave Runner{% endblock %}
+{% block content %}
+<div class="portal-page"><div class="container-fluid px-4 py-4">
+<div class="page-header mb-4"><h2 class="page-title"><i class="fas fa-square-root-variable me-2 text-accent"></i>MATLAB / Octave Runner</h2>
+<p class="page-sub">Upload a .m script and optional CSV dataset</p></div>
+<div class="row justify-content-center"><div class="col-lg-6">
+<div class="portal-card">
+<div class="portal-card-header"><i class="fas fa-file-code me-2"></i>Upload Files</div>
+<div class="portal-card-body">
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('octave.upload') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+<div class="mb-3"><label class="portal-label">Octave Script (.m) <span class="text-danger">*</span></label>
+<input type="file" name="script" accept=".m" class="form-control portal-input" required/></div>
+<div class="mb-4"><label class="portal-label">Dataset (optional CSV)</label>
+<input type="file" name="dataset" accept=".csv" class="form-control portal-input"/></div>
+<button type="submit" class="btn btn-launch w-100 py-2"><i class="fas fa-play me-2"></i>Run Script</button>
+</form></div></div></div></div></div></div>{% endblock %}

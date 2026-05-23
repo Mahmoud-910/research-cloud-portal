@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="csrf-token" content="{{ csrf_token() }}"/>
+  <title>{% block title %}Research Cloud Portal{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.cdnfonts.com/css/geist-sans" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='css/portal.css') }}" rel="stylesheet"/>
+</head>
+<body>
+
+{% if session.username %}
+<nav class="navbar navbar-expand-lg portal-nav">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('jobs.dashboard') }}">
+      <div class="brand-icon"><i class="fas fa-cloud"></i></div>
+      <div>
+        <div class="brand-name">ResearchCloud</div>
+        <div class="brand-sub">Powered by OpenNebula</div>
+      </div>
+    </a>
+    <div class="d-flex align-items-center gap-3 ms-auto">
+      <div class="nav-badge">
+        <i class="fas fa-circle-dot text-success me-1" style="font-size:.55rem;"></i>
+        <span class="mono">{{ session.role }}</span>
+      </div>
+      {% if session.role == 'Admin' %}
+      <a href="{{ url_for('admin.users') }}" class="btn btn-ghost btn-sm">
+        <i class="fas fa-users-gear me-1"></i>Users
+      </a>
+      {% endif %}
+      <div class="user-pill">
+        <i class="fas fa-user-astronaut me-2"></i>
+        <span>{{ session.get('name','User') }}</span>
+      </div>
+      <a href="{{ url_for('analysis.upload') }}" class="btn btn-ghost btn-sm">
+        <i class="fas fa-flask me-1"></i>Analyze Data
+      </a>
+      <a href="{{ url_for('octave.upload') }}" class="btn btn-ghost btn-sm">
+        <i class="fas fa-square-root-variable me-1"></i>MATLAB
+      </a>
+      <a href="{{ url_for('jobs.launch') }}" class="btn btn-launch btn-sm">
+        <i class="fas fa-plus me-1"></i> New VM
+      </a>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-ghost btn-sm">
+        <i class="fas fa-right-from-bracket"></i>
+      </a>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flash-container">
+  {% for cat, msg in messages %}
+  <div class="alert portal-alert portal-alert-{{ cat }} alert-dismissible fade show" role="alert">
+    {% if cat == 'success' %}<i class="fas fa-check-circle me-2"></i>
+    {% elif cat == 'danger' %}<i class="fas fa-exclamation-circle me-2"></i>
+    {% elif cat == 'warning' %}<i class="fas fa-triangle-exclamation me-2"></i>
+    {% else %}<i class="fas fa-info-circle me-2"></i>{% endif %}
+    {{ msg }}
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+{% block content %}{% endblock %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/portal.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

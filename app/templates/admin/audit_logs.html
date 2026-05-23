@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs — Admin{% endblock %}
+
+{% block content %}
+<div class="portal-page">
+  <div class="container-fluid px-4 py-4">
+
+    <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+      <div>
+        <h2 class="page-title mb-0">
+          <i class="fas fa-scroll me-2 text-accent"></i>Audit Logs
+        </h2>
+        <p class="page-sub mb-0">Immutable event trail — every user action recorded</p>
+      </div>
+      <div class="ms-auto d-flex gap-2">
+        <a href="{{ url_for('admin.users') }}" class="btn btn-ghost btn-sm">
+          <i class="fas fa-users me-1"></i>Users
+        </a>
+        <a href="{{ url_for('admin.vm_usage') }}" class="btn btn-ghost btn-sm">
+          <i class="fas fa-server me-1"></i>VM Usage
+        </a>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="portal-card mb-4">
+      <div class="portal-card-body">
+        <form method="GET" class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="portal-label">Action</label>
+            <input type="text" name="action" value="{{ action_filter }}"
+                   class="form-control portal-input" placeholder="e.g. LOGIN_FAILURE"/>
+          </div>
+          <div class="col-md-3">
+            <label class="portal-label">Username</label>
+            <input type="text" name="username" value="{{ username_filter }}"
+                   class="form-control portal-input" placeholder="e.g. user1"/>
+          </div>
+          <div class="col-md-3">
+            <label class="portal-label">IP Address</label>
+            <input type="text" name="ip" value="{{ ip_filter }}"
+                   class="form-control portal-input" placeholder="e.g. 192.168.1."/>
+          </div>
+          <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-launch flex-fill">
+              <i class="fas fa-filter me-1"></i>Filter
+            </button>
+            <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-ghost">Clear</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Log table -->
+    <div class="portal-card">
+      <div class="portal-card-header">
+        <i class="fas fa-list me-2"></i>Events
+        <span class="ms-auto mono text-xs text-muted">
+          Page {{ pagination.page }} of {{ pagination.pages }} · {{ pagination.total }} total
+        </span>
+      </div>
+      <div class="portal-card-body p-0">
+        <div class="table-responsive">
+          <table class="portal-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Resource</th>
+                <th>IP Address</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in logs %}
+              <tr>
+                <td class="mono" style="font-size:11px;white-space:nowrap;">
+                  {{ (log.created_at | int) | timestamp_fmt }}
+                </td>
+                <td class="mono" style="font-size:12px;">
+                  {{ users_map.get(log.user_id, '—') }}
+                </td>
+                <td>
+                  <span class="act-badge act-{{ log.action | action_category }}">
+                    {{ log.action }}
+                  </span>
+                </td>
+                <td class="mono" style="font-size:11px;color:var(--text-2);">
+                  {% if log.resource_type %}
+                    <span style="color:var(--text-3);">{{ log.resource_type }}</span>
+                    {% if log.resource_id %} #{{ log.resource_id }}{% endif %}
+                  {% else %}—{% endif %}
+                </td>
+                <td class="mono" style="font-size:11px;">{{ log.ip_address or '—' }}</td>
+                <td style="font-size:11px;color:var(--text-3);max-width:260px;
+                           overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                    title="{{ log.detail or '' }}">
+                  {{ log.detail | truncate(60) if log.detail else '—' }}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="text-center py-5" style="color:var(--text-3);">
+                  No events match the current filters.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="d-flex justify-content-center gap-2 mt-4">
+      {% if pagination.has_prev %}
+      <a href="{{ url_for('admin.audit_logs', page=pagination.prev_num,
+                          action=action_filter, username=username_filter, ip=ip_filter) }}"
+         class="btn btn-ghost btn-sm"><i class="fas fa-chevron-left"></i></a>
+      {% endif %}
+      <span class="btn btn-ghost btn-sm" style="cursor:default;">
+        {{ pagination.page }} / {{ pagination.pages }}
+      </span>
+      {% if pagination.has_next %}
+      <a href="{{ url_for('admin.audit_logs', page=pagination.next_num,
+                          action=action_filter, username=username_filter, ip=ip_filter) }}"
+         class="btn btn-ghost btn-sm"><i class="fas fa-chevron-right"></i></a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.act-badge {
+  display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.4px;padding:2px 8px;border-radius:4px;white-space:nowrap;
+  background:var(--surface-3);color:var(--text-3);
+}
+.act-auth    { background:rgba(0,229,160,.12);color:var(--emerald); }
+.act-failure { background:rgba(239,68,68,.12);color:#ef4444; }
+.act-job     { background:rgba(0,212,255,.10);color:var(--cyan); }
+.act-admin   { background:rgba(234,179,8,.12);color:#eab308; }
+.act-security{ background:rgba(239,68,68,.08);color:#f87171; }
+.portal-input {
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--text);font-size:13px;border-radius:var(--r-sm);
+}
+.portal-input:focus {
+  border-color:var(--cyan);box-shadow:0 0 0 2px var(--cyan-dim);
+  background:var(--surface-2);color:var(--text);
+}
+</style>
+{% endblock %}

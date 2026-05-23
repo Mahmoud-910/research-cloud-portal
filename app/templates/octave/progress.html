@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block title %}Running Octave Script{% endblock %}
+{% block content %}
+<div class="portal-page"><div class="container-fluid px-4 py-4">
+<div class="page-header mb-4"><h2 class="page-title"><i class="fas fa-cog fa-spin me-2 text-accent"></i>Running Script</h2></div>
+<div class="row justify-content-center"><div class="col-lg-6">
+<div class="portal-card text-center p-4">
+<i class="fas fa-square-root-variable processing-icon mb-4"></i>
+<p class="mono text-accent mb-3" id="step-text">Starting Octave…</p>
+<div class="progress portal-progress mb-4"><div class="progress-bar progress-bar-striped progress-bar-animated" id="progress-bar" style="width:0%"></div></div>
+<a href="{{ url_for('octave.results', job_id=job_id) }}" class="btn btn-launch w-100 d-none" id="view-btn"><i class="fas fa-terminal me-2"></i>View Output</a>
+<div class="alert portal-alert portal-alert-danger mt-3 d-none" id="error-msg"></div>
+</div></div></div></div></div>{% endblock %}
+{% block scripts %}<script>
+const TASK_ID="{{task_id}}",JOB_ID="{{job_id}}";
+function poll(){
+  fetch(`/octave/status/${TASK_ID}`).then(r=>r.json()).then(d=>{
+    document.getElementById('step-text').textContent=d.step||'Running...';
+    document.getElementById('progress-bar').style.width=(d.percent||0)+'%';
+    if(d.state==='SUCCESS'){document.getElementById('view-btn').classList.remove('d-none');}
+    else if(d.state==='FAILURE'){document.getElementById('error-msg').classList.remove('d-none');document.getElementById('error-msg').textContent=d.step;}
+    else{setTimeout(poll,2000);}
+  }).catch(()=>setTimeout(poll,3000));
+}
+poll();
+</script>{% endblock %}

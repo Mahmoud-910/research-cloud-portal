@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}Octave Results{% endblock %}
+{% block content %}
+<div class="portal-page"><div class="container-fluid px-4 py-4">
+<div class="page-header mb-4"><h2 class="page-title"><i class="fas fa-terminal me-2 text-accent"></i>Octave Output</h2>
+<p class="page-sub mono">Job #{{ job_id }}</p></div>
+<div class="portal-card">
+<div class="portal-card-header"><i class="fas fa-file-lines me-2"></i>Script Output</div>
+<div class="portal-card-body p-0">
+<pre class="terminal-output">{{ summary.stdout or '(no output)' }}</pre>
+{% if summary.stderr %}<pre class="terminal-output terminal-error">{{ summary.stderr }}</pre>{% endif %}
+</div></div>
+<div class="d-flex gap-2 mt-3">
+<a href="{{ url_for('octave.upload') }}" class="btn btn-launch btn-sm"><i class="fas fa-plus me-1"></i>New Script</a>
+<a href="{{ url_for('jobs.dashboard') }}" class="btn btn-ghost btn-sm"><i class="fas fa-gauge-high me-1"></i>Dashboard</a>
+</div>
+</div></div>{% endblock %}

@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Upload Dataset — Research Cloud Portal{% endblock %}
+
+{% block content %}
+<div class="portal-page">
+  <div class="container-fluid px-4 py-4">
+
+    <div class="page-header mb-4">
+      <h2 class="page-title"><i class="fas fa-flask me-2 text-accent"></i>Data Analysis</h2>
+      <p class="page-sub">Upload your dataset and choose what to do with it</p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('analysis.upload') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <div class="row g-4">
+
+        <!-- Left: Upload + Operations -->
+        <div class="col-lg-8">
+
+          <!-- Upload -->
+          <div class="portal-card mb-4">
+            <div class="portal-card-header">
+              <span class="step-num">01</span>
+              <i class="fas fa-file-csv me-2"></i>Upload CSV Dataset
+            </div>
+            <div class="portal-card-body">
+              <div class="upload-zone" id="upload-zone">
+                <i class="fas fa-cloud-arrow-up upload-icon"></i>
+                <p class="upload-text">Drop your CSV here or
+                  <label for="dataset-input" class="upload-link">browse</label>
+                </p>
+                <p class="upload-sub">CSV files only — max 16 MB</p>
+                <input type="file" name="dataset" id="dataset-input"
+                       accept=".csv" class="d-none" required/>
+                <div id="file-preview" class="file-preview d-none">
+                  <i class="fas fa-file-csv me-2 text-success"></i>
+                  <span id="file-name"></span>
+                  <span id="file-size" class="text-muted ms-2"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Operations -->
+          <div class="portal-card mb-4">
+            <div class="portal-card-header">
+              <span class="step-num">02</span>
+              <i class="fas fa-sliders me-2"></i>Choose Operations
+            </div>
+            <div class="portal-card-body">
+              <div class="row g-3">
+
+                <div class="col-md-6">
+                  <label class="op-option">
+                    <input type="checkbox" name="operations" value="cleaning" checked/>
+                    <div class="op-card">
+                      <div class="op-icon"><i class="fas fa-broom"></i></div>
+                      <div class="op-name">Data Cleaning</div>
+                      <div class="op-desc">Remove duplicates, fill missing values automatically</div>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="op-option">
+                    <input type="checkbox" name="operations" value="stats" checked/>
+                    <div class="op-card">
+                      <div class="op-icon"><i class="fas fa-chart-bar"></i></div>
+                      <div class="op-name">Statistical Analysis</div>
+                      <div class="op-desc">Mean, std, correlation matrix, descriptive stats</div>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="op-option">
+                    <input type="checkbox" name="operations" value="charts" checked/>
+                    <div class="op-card">
+                      <div class="op-icon"><i class="fas fa-chart-line"></i></div>
+                      <div class="op-name">Charts & Visualizations</div>
+                      <div class="op-desc">Histograms, correlation heatmap, feature importance</div>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="op-option">
+                    <input type="checkbox" name="operations" value="ml" checked/>
+                    <div class="op-card">
+                      <div class="op-icon"><i class="fas fa-brain"></i></div>
+                      <div class="op-name">Machine Learning</div>
+                      <div class="op-desc">Train RandomForest, get R² score, feature importance</div>
+                    </div>
+                  </label>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Summary -->
+        <div class="col-lg-4">
+          <div class="portal-card sticky-top" style="top:74px">
+            <div class="portal-card-header"><i class="fas fa-clipboard-list me-2"></i>Summary</div>
+            <div class="portal-card-body">
+              <div class="summary-row">
+                <span class="summary-label">File</span>
+                <span class="summary-val mono" id="sum-file">No file selected</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Size</span>
+                <span class="summary-val mono" id="sum-size">—</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Operations</span>
+                <span class="summary-val mono" id="sum-ops">All selected</span>
+              </div>
+              <hr class="border-secondary my-3"/>
+              <p class="text-muted small mb-3">
+                <i class="fas fa-info-circle me-1"></i>
+                Processing runs in background via Celery. You'll see a live progress bar.
+              </p>
+              <div class="mb-3">
+                <label class="portal-label">Processing Engine</label>
+                <div class="d-flex gap-2">
+                  <label class="sw-option flex-fill">
+                    <input type="radio" name="run_on_vm" value="0" class="sw-radio" checked/>
+                    <div class="sw-card text-center">
+                      <i class="fas fa-laptop me-1"></i>
+                      <div class="sw-name">Local</div>
+                      <div class="sw-pkgs">This machine</div>
+                    </div>
+                  </label>
+                  <label class="sw-option flex-fill">
+                    <input type="radio" name="run_on_vm" value="1" class="sw-radio" id="vm-radio"/>
+                    <div class="sw-card text-center">
+                      <i class="fas fa-server me-1"></i>
+                      <div class="sw-name">VM</div>
+                      <div class="sw-pkgs">OpenNebula</div>
+                    </div>
+                  </label>
+                </div>
+                <div id="vm-id-input" class="mt-2 d-none">
+                  <input type="number" name="vm_id" class="form-control portal-select"
+                         placeholder="VM ID (e.g. 56)" min="1"/>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-launch w-100 py-2">
+                <i class="fas fa-play me-2"></i>Start Processing
+              </button>
+              <a href="{{ url_for('jobs.dashboard') }}" class="btn btn-ghost w-100 mt-2">Cancel</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const input = document.getElementById('dataset-input');
+const zone  = document.getElementById('upload-zone');
+
+input.addEventListener('change', () => {
+  if (input.files[0]) {
+    const f = input.files[0];
+    document.getElementById('file-name').textContent = f.name;
+    document.getElementById('file-size').textContent = (f.size/1024).toFixed(1) + ' KB';
+    document.getElementById('file-preview').classList.remove('d-none');
+    document.getElementById('sum-file').textContent = f.name;
+    document.getElementById('sum-size').textContent = (f.size/1024).toFixed(1) + ' KB';
+  }
+});
+
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) {
+    input.files = e.dataTransfer.files;
+    input.dispatchEvent(new Event('change'));
+  }
+});
+
+// Update ops summary
+document.querySelectorAll('input[name="operations"]').forEach(cb => {
+  cb.addEventListener('change', () => {
+    const selected = [...document.querySelectorAll('input[name="operations"]:checked')]
+                     .map(c => c.value);
+    document.getElementById('sum-ops').textContent =
+      selected.length ? selected.join(', ') : 'None selected';
+  });
+});
+// Show VM ID input when VM radio selected
+document.querySelectorAll('input[name="run_on_vm"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const vmInput = document.getElementById('vm-id-input');
+    vmInput.classList.toggle('d-none', r.value !== '1');
+  });
+});
+</script>
+{% endblock %}

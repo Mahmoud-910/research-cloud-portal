@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.job_id }} — Pipeline Progress{% endblock %}
+
+{% block content %}
+<div class="portal-page">
+  <div class="container px-4 py-4" style="max-width:900px;">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{{ url_for('jobs.dashboard') }}" class="btn btn-ghost btn-sm">
+        <i class="fas fa-arrow-left me-1"></i>Dashboard
+      </a>
+      <div>
+        <h2 class="page-title mb-0">
+          <i class="fas fa-wave-square me-2 text-accent"></i>
+          Pipeline Progress
+        </h2>
+        <p class="page-sub mb-0">Job <span class="mono text-accent">{{ job.job_id }}</span></p>
+      </div>
+      <div class="ms-auto">
+        <span class="badge-status" id="hdr-badge">
+          {{ job.status | upper }}
+        </span>
+      </div>
+    </div>
+
+    <!-- ── Top info bar ──────────────────────────────────────────────────── -->
+    <div class="portal-card mb-4">
+      <div class="portal-card-body">
+        <div class="info-bar">
+          <div class="info-item">
+            <span class="info-label">OS</span>
+            <span class="info-val mono">{{ job.os_icon }} {{ job.os_label or job.os_image }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">CPU</span>
+            <span class="info-val mono">{{ job.cpu }} vCPU</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">RAM</span>
+            <span class="info-val mono">{{ job.ram }} GB</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Stack</span>
+            <span class="info-val mono">{{ job.sw_label or job.software }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Dataset</span>
+            <span class="info-val mono" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {{ job.dataset or '—' }}
+            </span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">VM ID</span>
+            <span class="info-val mono" id="inf-vmid">{{ job.vm_id or '—' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">VM IP</span>
+            <span class="info-val mono" id="inf-vmip">{{ job.vm_ip or '—' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Elapsed</span>
+            <span class="info-val mono" id="inf-elapsed">0s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Progress bar ──────────────────────────────────────────────────── -->
+    <div class="portal-card mb-4">
+      <div class="portal-card-body pb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span style="font-size:12px;color:var(--text-3);" id="prog-label">Initialising…</span>
+          <span class="mono" style="font-size:13px;color:var(--cyan);" id="prog-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="prog-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Pipeline timeline ──────────────────────────────────────────────── -->
+    <div class="portal-card mb-4">
+      <div class="portal-card-header">
+        <i class="fas fa-list-check me-2"></i>Pipeline Timeline
+      </div>
+      <div class="portal-card-body">
+        <div class="timeline" id="timeline">
+
+          {% set steps = [
+            ('provisioning',  'Provision VM',           'fas fa-server'),
+            ('resizing_disk', 'Resize disk → 10 GB',    'fas fa-hard-drive'),
+            ('booting',       'Wait for VM to boot',    'fas fa-power-off'),
+            ('waiting_ssh',   'Wait for SSH ready',     'fas fa-terminal'),
+            ('bootstrapping', 'Bootstrap + install libs','fas fa-box-open'),
+            ('uploading',     'Upload dataset via SCP', 'fas fa-upload'),
+            ('running',       'Run analysis on VM',     'fas fa-flask'),
+            ('completed',     'Fetch results',          'fas fa-check-circle'),
+          ] %}
+
+          {% for step_key, step_name, step_icon in steps %}
+          <div class="tl-step" id="tl-{{ step_key }}" data-key="{{ step_key }}">
+            <div class="tl-icon-wrap">
+              <div class="tl-icon" id="tli-{{ step_key }}">
+                <i class="{{ step_icon }}"></i>
+              </div>
+              {% if not loop.last %}<div class="tl-line" id="tll-{{ step_key }}"></div>{% endif %}
+            </div>
+            <div class="tl-body">
+              <div class="tl-title" id="tlt-{{ step_key }}">{{ step_name }}</div>
+              <div class="tl-sub" id="tls-{{ step_key }}">Waiting…</div>
+            </div>
+            <div class="tl-badge" id="tlb-{{ step_key }}">
+              <span class="tl-tag pending">Pending</span>
+            </div>
+          </div>
+          {% endfor %}
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Error box (hidden until failed) ──────────────────────────────── -->
+    <div class="alert-box alert-danger d-none mb-4" id="error-box">
+      <i class="fas fa-circle-exclamation me-2"></i>
+      <strong>Pipeline Error</strong>
+      <pre id="error-msg" class="mt-2 mb-0 mono"
+           style="font-size:11px;white-space:pre-wrap;word-break:break-all;"></pre>
+    </div>
+
+    <!-- ── Action buttons ────────────────────────────────────────────────── -->
+    <div class="d-flex gap-3 d-none" id="result-actions">
+      <a href="{{ url_for('jobs.job_results', job_id=job.job_id) }}"
+         class="btn btn-launch">
+        <i class="fas fa-chart-bar me-2"></i>View Full Results
+      </a>
+      <a href="{{ url_for('jobs.download_result', job_id=job.job_id) }}"
+         class="btn btn-outline-secondary">
+        <i class="fas fa-download me-2"></i>Download CSV
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Info bar ───────────────────────────────────────────────────── */
+.info-bar {
+  display:flex; flex-wrap:wrap; gap:0;
+}
+.info-item {
+  display:flex; flex-direction:column; gap:2px;
+  padding:8px 20px 8px 0; margin-right:20px;
+  border-right:1px solid var(--border);
+  font-size:12px;
+}
+.info-item:last-child { border-right:none; }
+.info-label { font-size:9px; text-transform:uppercase; letter-spacing:.6px;
+               color:var(--text-3); font-weight:600; }
+.info-val { color:var(--text); }
+
+/* ── Progress bar ───────────────────────────────────────────────── */
+.progress-track {
+  height:6px; background:var(--surface-3);
+  border-radius:3px; overflow:hidden;
+}
+.progress-fill {
+  height:100%; background:linear-gradient(90deg, var(--cyan), var(--emerald));
+  border-radius:3px; transition:width .5s ease;
+}
+
+/* ── Timeline ───────────────────────────────────────────────────── */
+.timeline { display:flex; flex-direction:column; }
+.tl-step {
+  display:flex; gap:12px; align-items:flex-start;
+  padding:14px 0;
+  border-bottom:1px solid var(--border);
+}
+.tl-step:last-child { border-bottom:none; }
+.tl-icon-wrap { display:flex; flex-direction:column; align-items:center; gap:0; flex-shrink:0; }
+.tl-icon {
+  width:32px; height:32px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; flex-shrink:0;
+  background:var(--surface-3); border:1px solid var(--border);
+  color:var(--text-3); transition:all .3s;
+}
+.tl-line { width:2px; flex:1; min-height:14px; background:var(--border); margin-top:4px; }
+.tl-body { flex:1; }
+.tl-title { font-size:13px; font-weight:600; color:var(--text); }
+.tl-sub   { font-size:11px; color:var(--text-3); margin-top:2px; }
+.tl-badge { flex-shrink:0; }
+
+/* Step states */
+.tl-tag {
+  font-size:9px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.5px; padding:2px 8px; border-radius:4px;
+}
+.tl-tag.pending  { background:var(--surface-3); color:var(--text-3); }
+.tl-tag.active   { background:rgba(0,212,255,.12); color:var(--cyan);
+                    border:1px solid rgba(0,212,255,.25); }
+.tl-tag.done     { background:rgba(0,229,160,.12); color:var(--emerald);
+                    border:1px solid rgba(0,229,160,.25); }
+.tl-tag.failed   { background:rgba(239,68,68,.12); color:#ef4444;
+                    border:1px solid rgba(239,68,68,.25); }
+
+.tl-icon.active  { background:rgba(0,212,255,.15); border-color:var(--cyan); color:var(--cyan); }
+.tl-icon.done    { background:rgba(0,229,160,.15); border-color:var(--emerald); color:var(--emerald); }
+.tl-icon.failed  { background:rgba(239,68,68,.15); border-color:#ef4444; color:#ef4444; }
+.tl-line.done    { background:var(--emerald); }
+.tl-line.active  { background:linear-gradient(180deg,var(--cyan),var(--border)); }
+
+/* ── Header badge ───────────────────────────────────────────────── */
+.badge-status {
+  display:inline-block; font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.6px;
+  padding:4px 12px; border-radius:20px;
+  background:var(--surface-3); color:var(--text-3);
+  border:1px solid var(--border);
+  transition:all .3s;
+}
+.badge-status.running    { background:rgba(0,212,255,.12); color:var(--cyan); border-color:rgba(0,212,255,.3); }
+.badge-status.completed  { background:rgba(0,229,160,.12); color:var(--emerald); border-color:rgba(0,229,160,.3); }
+.badge-status.failed     { background:rgba(239,68,68,.12); color:#ef4444; border-color:rgba(239,68,68,.3); }
+
+/* ── Alert box ──────────────────────────────────────────────────── */
+.alert-box {
+  padding:14px 18px; border-radius:var(--r-lg);
+  font-size:13px;
+}
+.alert-danger { background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.25); color:#fca5a5; }
+
+/* ── Spinner on active icon ─────────────────────────────────────── */
+@keyframes spin { to { transform:rotate(360deg); } }
+.fa-spinner.spinning { animation:spin .8s linear infinite; }
+</style>
+
+<script>
+// ── Pipeline step ordering ─────────────────────────────────────────────────
+const STEP_ORDER = [
+  'provisioning','resizing_disk','booting',
+  'waiting_ssh','bootstrapping','uploading','running','completed'
+];
+
+const STEP_LABELS = {{ step_labels | tojson }};
+const JOB_ID     = "{{ job.job_id }}";
+const STATUS_URL = "{{ url_for('jobs.job_status', job_id=job.job_id) }}";
+
+let prevStatus = null;
+let pollInterval = null;
+
+// ── Update the full UI based on an API response ────────────────────────────
+function applyStatus(data) {
+  const status  = data.status;
+  const pct     = data.percent || 0;
+  const label   = data.step_label || status;
+
+  // Progress bar
+  document.getElementById('prog-bar').style.width   = pct + '%';
+  document.getElementById('prog-pct').textContent   = pct + '%';
+  document.getElementById('prog-label').textContent = label;
+
+  // Header badge
+  const badge = document.getElementById('hdr-badge');
+  badge.textContent = status.toUpperCase().replace('_', ' ');
+  badge.className   = 'badge-status';
+  if (['provisioning','resizing_disk','booting','waiting_ssh',
+       'bootstrapping','uploading','running'].includes(status)) {
+    badge.classList.add('running');
+  } else if (status === 'completed') {
+    badge.classList.add('completed');
+  } else if (status === 'failed') {
+    badge.classList.add('failed');
+  }
+
+  // Info bar
+  if (data.vm_id) document.getElementById('inf-vmid').textContent = data.vm_id;
+  if (data.vm_ip) document.getElementById('inf-vmip').textContent = data.vm_ip;
+  document.getElementById('inf-elapsed').textContent = data.elapsed + 's';
+
+  // Timeline
+  const currentIdx = STEP_ORDER.indexOf(status);
+  STEP_ORDER.forEach((key, idx) => {
+    const icon  = document.getElementById('tli-' + key);
+    const tag   = document.getElementById('tlb-' + key).querySelector('.tl-tag');
+    const sub   = document.getElementById('tls-' + key);
+    const line  = document.getElementById('tll-' + key);
+    if (!icon) return;
+
+    icon.className = 'tl-icon';
+    tag.className  = 'tl-tag';
+
+    if (status === 'failed' && idx === currentIdx) {
+      // Mark the failed step
+      icon.classList.add('failed');
+      tag.classList.add('failed');
+      tag.textContent = 'Failed';
+      sub.textContent  = 'Error — see details below';
+      if (line) line.className = 'tl-line';
+    } else if (idx < currentIdx || status === 'completed') {
+      // Completed step
+      icon.classList.add('done');
+      tag.classList.add('done');
+      tag.textContent = 'Done';
+      sub.textContent  = '✓ Completed';
+      if (line) line.className = 'tl-line done';
+    } else if (idx === currentIdx) {
+      // Active step
+      icon.classList.add('active');
+      // Swap icon to a spinner
+      icon.innerHTML = '<i class="fas fa-spinner spinning"></i>';
+      tag.classList.add('active');
+      tag.textContent = 'Running';
+      sub.textContent  = 'In progress…';
+      if (line) line.className = 'tl-line active';
+    } else {
+      // Pending
+      tag.classList.add('pending');
+      tag.textContent = 'Pending';
+      sub.textContent  = 'Waiting…';
+    }
+  });
+
+  // Error box
+  if (status === 'failed' && data.error_msg) {
+    document.getElementById('error-box').classList.remove('d-none');
+    document.getElementById('error-msg').textContent = data.error_msg;
+  }
+
+  // Result actions
+  if (status === 'completed' && data.has_result) {
+    document.getElementById('result-actions').classList.remove('d-none');
+  }
+
+  // Stop polling when terminal
+  if (['completed','failed','terminated'].includes(status)) {
+    clearInterval(pollInterval);
+  }
+}
+
+// ── Poll the status endpoint ───────────────────────────────────────────────
+async function poll() {
+  try {
+    const res  = await fetch(STATUS_URL);
+    const data = await res.json();
+    if (data.status !== prevStatus) {
+      prevStatus = data.status;
+      applyStatus(data);
+    } else {
+      // Still update elapsed even when step hasn't changed
+      const el = document.getElementById('inf-elapsed');
+      if (el && data.elapsed) el.textContent = data.elapsed + 's';
+    }
+  } catch (err) {
+    console.warn('Poll error:', err);
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+poll();
+pollInterval = setInterval(poll, 3000);
+</script>
+{% endblock %}

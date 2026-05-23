@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}Launch VM{% endblock %}
+{% block content %}
+<div class="portal-page d-flex align-items-center justify-content-center" style="min-height:60vh;">
+  <div class="text-center">
+    <i class="fas fa-rocket fa-3x mb-4" style="color:var(--cyan)"></i>
+    <h3 class="mb-3">Redirecting to Unified Launch Form…</h3>
+    <a href="{{ url_for('jobs.launch') }}" class="btn btn-launch">
+      <i class="fas fa-arrow-right me-2"></i>Go to Launch
+    </a>
+  </div>
+</div>{% endblock %}
