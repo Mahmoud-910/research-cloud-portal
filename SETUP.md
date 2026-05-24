@@ -1,13 +1,9 @@
 # Research Cloud Portal v3 — Complete Setup Guide
 
 ## User Accounts
-
-| Full Name    | Username     | Password        | Role       |
-|-------------|--------------|-----------------|------------|
-| Mahmoud Ali | mahmoud.ali  | Admin@RCP2025!  | Admin      |
-| User One    | user1        | User1@RCP2025!  | Researcher |
-| User Two    | user2        | User2@RCP2025!  | Researcher |
-
+| Mahmoud Ali | mahmoud.ali | set via ADMIN_PASSWORD in .env  | Admin      |
+| User One    | user1       | set via USER1_PASSWORD in .env  | Researcher |
+| User Two    | user2       | set via USER2_PASSWORD in .env  | Researcher |
 > All users are prompted to change their password on first login.
 
 ---
